@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Hyperliquid Trader Analysis – Fear & Greed Study</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a1a;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Top bar */
+  .topbar {
+    background: #1e2d40;
+    color: #fff;
+    padding: 14px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topbar-title { font-size: 15px; font-weight: 600; letter-spacing: 0.2px; }
+  .topbar-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #94a3b8; }
+
+  /* Page wrapper */
+  .page { max-width: 1180px; margin: 0 auto; padding: 36px 32px 60px; }
+
+  /* Section header */
+  .section-head {
+    display: flex; align-items: baseline; gap: 12px;
+    border-bottom: 2px solid #1e2d40;
+    padding-bottom: 8px;
+    margin: 36px 0 20px;
+  }
+  .section-head h2 { font-size: 15px; font-weight: 600; color: #1e2d40; }
+  .section-head span { font-size: 12px; color: #64748b; }
+
+  /* Report intro */
+  .intro {
+    background: #fff;
+    border: 1px solid #dde1e7;
+    border-left: 4px solid #1e2d40;
+    padding: 20px 24px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .intro p { font-size: 13px; color: #334155; line-height: 1.7; }
+  .intro p + p { margin-top: 8px; }
+
+  /* KPI strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  @media(max-width:900px){ .kpi-strip { grid-template-columns: repeat(3,1fr); } }
+  .kpi-card {
+    background: #fff;
+    border: 1px solid #dde1e7;
+    border-radius: 4px;
+    padding: 16px 14px;
+  }
+  .kpi-label { font-size: 10px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .kpi-val { font-size: 22px; font-weight: 600; color: #1e2d40; }
+  .kpi-note { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+  /* Two-col layout */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media(max-width:800px){ .two-col,.three-col { grid-template-columns: 1fr; } }
+
+  /* Chart card */
+  .card {
+    background: #fff;
+    border: 1px solid #dde1e7;
+    border-radius: 4px;
+    padding: 20px 20px 16px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: #1e2d40; margin-bottom: 2px; }
+  .card-sub { font-size: 11px; color: #94a3b8; margin-bottom: 16px; }
+  .card canvas { display: block; }
+
+  /* Table */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead tr { background: #f1f5f9; }
+  th {
+    text-align: left; padding: 9px 12px;
+    font-size: 10.5px; font-weight: 600; color: #475569;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    border-bottom: 1px solid #dde1e7;
+  }
+  td { padding: 9px 12px; border-bottom: 1px solid #f1f4f8; color: #1e293b; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafc; }
+  .mono { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #64748b; }
+  .green { color: #2d7a4f; font-weight: 600; }
+  .red { color: #b91c1c; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 10px; padding: 2px 7px;
+    border-radius: 3px; font-weight: 500;
+  }
+  .tag-g { background: #dcfce7; color: #166534; }
+  .tag-f { background: #fee2e2; color: #991b1b; }
+  .tag-n { background: #fef9c3; color: #854d0e; }
+  .tag-eg { background: #bbf7d0; color: #14532d; }
+  .tag-ef { background: #fecaca; color: #7f1d1d; }
+
+  /* Insight boxes */
+  .insight-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 12px; margin-bottom: 16px; }
+  .insight-box {
+    background: #fff;
+    border: 1px solid #dde1e7;
+    border-radius: 4px;
+    padding: 16px 16px 14px;
+    border-top: 3px solid #1e2d40;
+  }
+  .insight-box.amber { border-top-color: #d97706; }
+  .insight-box.red   { border-top-color: #dc2626; }
+  .insight-box.green { border-top-color: #2d7a4f; }
+  .ib-num { font-size: 11px; font-weight: 600; color: #94a3b8; margin-bottom: 6px; }
+  .ib-title { font-size: 13px; font-weight: 600; color: #1e2d40; margin-bottom: 5px; }
+  .ib-text { font-size: 12px; color: #475569; line-height: 1.65; }
+
+  /* Bar rows */
+  .bar-rows { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
+  .br-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .br-name { font-weight: 500; color: #1e2d40; }
+  .br-val { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #64748b; }
+  .br-track { height: 7px; background: #e9ecef; border-radius: 4px; overflow: hidden; }
+  .br-fill { height: 100%; border-radius: 4px; }
+
+  /* Conclusion */
+  .conclusion {
+    background: #fff;
+    border: 1px solid #dde1e7;
+    border-radius: 4px;
+    padding: 24px;
+  }
+  .conclusion h3 { font-size: 14px; font-weight: 600; color: #1e2d40; margin-bottom: 12px; }
+  .conclusion p { font-size: 13px; color: #334155; line-height: 1.75; margin-bottom: 10px; }
+  .conclusion ul { padding-left: 20px; }
+  .conclusion li { font-size: 13px; color: #334155; line-height: 1.75; margin-bottom: 4px; }
+
+  footer {
+    margin-top: 48px;
+    border-top: 1px solid #dde1e7;
+    padding-top: 16px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">Hyperliquid Trader Performance × Bitcoin Fear &amp; Greed Index — Exploratory Analysis</div>
+  <div class="topbar-meta">Dataset: May 2023 – May 2025 &nbsp;|&nbsp; 211,224 trades</div>
+</div>
+
+<div class="page">
+
+  <!-- Intro -->
+  <div class="section-head" style="margin-top:0;">
+    <h2>Overview</h2>
+    <span>Data Science Assignment — Sentiment vs. Performance Study</span>
+  </div>
+  <div class="intro">
+    <p>This report analyses 211,224 trades from Hyperliquid against the Bitcoin Fear &amp; Greed Index to understand how market sentiment affects trader behaviour and profitability. Two datasets were merged on trade date: the historical Hyperliquid trade log and the daily Fear &amp; Greed classification (Extreme Fear → Extreme Greed).</p>
+    <p>Key dimensions explored: total and per-trade PnL by sentiment, win rates, trade volume patterns, asset-level performance across sentiment regimes, and a comparison of top vs. bottom traders.</p>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section-head"><h2>Summary Statistics</h2><span>Across all accounts and dates</span></div>
+  <div class="kpi-strip" id="kpiStrip"></div>
+
+  <!-- Chart row 1 -->
+  <div class="section-head"><h2>1. Sentiment vs. PnL</h2><span>How different market moods affect profitability</span></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Total Closed PnL by Sentiment Regime</div>
+      <div class="card-sub">Aggregate profit/loss of all traders, grouped by market sentiment on the trade date</div>
+      <canvas id="pnlBar" height="230"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Win Rate &amp; Avg PnL per Trade</div>
+      <div class="card-sub">% of profitable trades (left axis) vs. average closed PnL per trade (right axis)</div>
+      <canvas id="winBar" height="230"></canvas>
+    </div>
+  </div>
+
+  <!-- Chart row 2 -->
+  <div class="section-head"><h2>2. Trade Volume &amp; Size Patterns</h2><span>Activity levels across sentiment periods</span></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Volume Distribution by Sentiment (USD)</div>
+      <div class="card-sub">Total traded dollar value across each sentiment category</div>
+      <canvas id="volDonut" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Average Trade Size vs. Win Rate by Sentiment</div>
+      <div class="card-sub">Larger average trade sizes don't always correlate with better win rates</div>
+      <div class="bar-rows" id="barRows"></div>
+    </div>
+  </div>
+
+  <!-- Monthly trend -->
+  <div class="section-head"><h2>3. Monthly PnL Trend</h2><span>Dec 2023 – May 2025</span></div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">Aggregate Monthly Closed PnL</div>
+    <div class="card-sub">Bars above zero = net profitable month for all traders combined; red = net loss month</div>
+    <canvas id="monthlyBar" height="170"></canvas>
+  </div>
+
+  <!-- Coin x sentiment -->
+  <div class="section-head"><h2>4. Asset-Level Analysis</h2><span>Top 5 coins × sentiment regime</span></div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-title">Average PnL per Trade — Top 5 Assets × Market Sentiment</div>
+    <div class="card-sub">Each group of bars represents one asset; colors represent sentiment regimes</div>
+    <canvas id="coinGrouped" height="200"></canvas>
+  </div>
+
+  <!-- Tables -->
+  <div class="section-head"><h2>5. Trader-Level Breakdown</h2><span>Top 5 earners vs. 5 worst performers (min 10 trades)</span></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Top 5 Traders — Total PnL</div>
+      <div class="card-sub">Highest earners; note relatively low win rates offset by large position sizing</div>
+      <div class="tbl-wrap"><table id="topTbl"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Worst 5 Traders — Total PnL</div>
+      <div class="card-sub">Persistent net-negative accounts; high trade frequency with poor outcome</div>
+      <div class="tbl-wrap"><table id="botTbl"></table></div>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="section-head"><h2>6. Key Findings</h2><span>Actionable patterns from the data</span></div>
+  <div class="insight-grid" id="insightGrid"></div>
+
+  <!-- Conclusion -->
+  <div class="section-head"><h2>7. Conclusion &amp; Strategy Recommendations</h2></div>
+  <div class="conclusion">
+    <h3>What the data tells us</h3>
+    <p>The analysis of 211,224 Hyperliquid trades shows a clear and consistent relationship between market sentiment and trader profitability. Greed-phase trading outperforms Fear-phase trading by a significant margin — not just in total PnL, but also in average per-trade returns.</p>
+    <ul>
+      <li><strong>Sentiment-gated entry:</strong> Traders who enter positions during Greed periods (index ≥ 50) earn on average $64–$78 per trade, compared to $27–$29 during Fear. A simple sentiment filter can meaningfully improve expected value.</li>
+      <li><strong>Asset selection matters:</strong> ETH shows the highest sensitivity to sentiment — +$323/trade during Greed vs. −$184/trade during Extreme Greed (contrarian signal). SOL is consistently profitable across Greed and Neutral phases.</li>
+      <li><strong>Win rate is not alpha:</strong> The top earner achieved $2.14M with only a 33.7% win rate. The key differentiator is position sizing and cutting losses early, not trying to win more often.</li>
+      <li><strong>Avoid overtrading in Fear:</strong> Fear periods see the highest volume ($622M) but the worst win rates (36.87%). This suggests emotional, reactive trading during drawdowns is a primary driver of losses.</li>
+      <li><strong>December 2024 as a case study:</strong> A single month generated $3M+ in aggregate PnL — coinciding with peak Greed sentiment during the Bitcoin ETF-driven rally. Trend-following in high-Greed environments has historically paid off.</li>
+    </ul>
+  </div>
+
+  <footer>
+    Sources: Hyperliquid historical trade data · Alternative.me Bitcoin Fear &amp; Greed Index · Analysis period: May 2023 – May 2025
+  </footer>
+</div>
+
+<script>
+const SENT = ['Extreme Fear','Fear','Neutral','Greed','Extreme Greed'];
+
+// Colour palette — muted, professional
+const SENT_COLORS = {
+  'Extreme Fear': '#c0392b',
+  'Fear':         '#e07b54',
+  'Neutral':      '#d4ac0d',
+  'Greed':        '#27ae60',
+  'Extreme Greed':'#1a7a4a'
+};
+
+const PNL = [
+  { sentiment:'Extreme Fear', total_pnl:96335,    avg_pnl:29.26, trade_count:3292,  win_rate:45.66, total_volume:21608860,  avg_trade_size:6564 },
+  { sentiment:'Fear',         total_pnl:2094857,  avg_pnl:27.34, trade_count:76617, win_rate:36.87, total_volume:622493948, avg_trade_size:8125 },
+  { sentiment:'Neutral',      total_pnl:964930,   avg_pnl:39.20, trade_count:24618, win_rate:46.36, total_volume:142147267, avg_trade_size:5774 },
+  { sentiment:'Greed',        total_pnl:5560378,  avg_pnl:64.20, trade_count:86612, win_rate:41.62, total_volume:323734126, avg_trade_size:3738 },
+  { sentiment:'Extreme Greed',total_pnl:1580457,  avg_pnl:78.69, trade_count:20085, win_rate:48.10, total_volume:81203239,  avg_trade_size:4043 }
+];
+
+const COIN_SENT = [
+  {Coin:'BTC', sentiment:'Extreme Fear', avg_pnl:92.18}, {Coin:'BTC', sentiment:'Fear', avg_pnl:31.50}, {Coin:'BTC', sentiment:'Neutral', avg_pnl:42.00}, {Coin:'BTC', sentiment:'Greed', avg_pnl:26.72}, {Coin:'BTC', sentiment:'Extreme Greed', avg_pnl:45.44},
+  {Coin:'ETH', sentiment:'Extreme Fear', avg_pnl:-21.93}, {Coin:'ETH', sentiment:'Fear', avg_pnl:111.48}, {Coin:'ETH', sentiment:'Neutral', avg_pnl:-78.62}, {Coin:'ETH', sentiment:'Greed', avg_pnl:323.21}, {Coin:'ETH', sentiment:'Extreme Greed', avg_pnl:-184.13},
+  {Coin:'SOL', sentiment:'Extreme Fear', avg_pnl:10.81}, {Coin:'SOL', sentiment:'Fear', avg_pnl:133.11}, {Coin:'SOL', sentiment:'Neutral', avg_pnl:118.78}, {Coin:'SOL', sentiment:'Greed', avg_pnl:224.53}, {Coin:'SOL', sentiment:'Extreme Greed', avg_pnl:75.62},
+  {Coin:'HYPE',sentiment:'Extreme Fear', avg_pnl:7.03},  {Coin:'HYPE',sentiment:'Fear', avg_pnl:23.17},  {Coin:'HYPE',sentiment:'Neutral', avg_pnl:37.50},  {Coin:'HYPE',sentiment:'Greed', avg_pnl:23.88},  {Coin:'HYPE',sentiment:'Extreme Greed', avg_pnl:74.46},
+  {Coin:'@107',sentiment:'Extreme Fear', avg_pnl:1.94},  {Coin:'@107',sentiment:'Fear', avg_pnl:-21.76}, {Coin:'@107',sentiment:'Neutral', avg_pnl:-5.39},  {Coin:'@107',sentiment:'Greed', avg_pnl:97.34},  {Coin:'@107',sentiment:'Extreme Greed', avg_pnl:240.98}
+];
+
+const MONTHLY = [
+  {m:'Dec 23',pnl:2016},{m:'Jan 24',pnl:-13086},{m:'Feb 24',pnl:49863},{m:'Mar 24',pnl:124983},
+  {m:'Apr 24',pnl:8039},{m:'May 24',pnl:29331},{m:'Jun 24',pnl:102984},{m:'Jul 24',pnl:138562},
+  {m:'Aug 24',pnl:-106817},{m:'Sep 24',pnl:48236},{m:'Oct 24',pnl:86264},{m:'Nov 24',pnl:133430},
+  {m:'Dec 24',pnl:3005071},{m:'Jan 25',pnl:767746},{m:'Feb 25',pnl:2396979},{m:'Mar 25',pnl:2153251},
+  {m:'Apr 25',pnl:1315571},{m:'May 25',pnl:54537}
+];
+
+const TOP = [
+  {label:'Trader A', addr:'0xb123…ed23', pnl:2143382, trades:14733, wr:33.7},
+  {label:'Trader B', addr:'0x0833…082',  pnl:1600229, trades:3818,  wr:36.0},
+  {label:'Trader C', addr:'0xbaaa…864',  pnl:940163,  trades:21192, wr:46.8},
+  {label:'Trader D', addr:'0x513b…ff1',  pnl:840422,  trades:12236, wr:40.1},
+  {label:'Trader E', addr:'0xbee1…aab',  pnl:836080,  trades:40184, wr:42.8}
+];
+const BOT = [
+  {label:'Trader V', addr:'0x8170…63b', pnl:-167621, trades:4601, wr:38.3},
+  {label:'Trader W', addr:'0x271b…2ab', pnl:-70436,  trades:3809, wr:30.2},
+  {label:'Trader X', addr:'0x3998…891', pnl:-31203,  trades:815,  wr:45.5},
+  {label:'Trader Y', addr:'0x39ce…e3c', pnl:14456,   trades:3589, wr:32.8},
+  {label:'Trader Z', addr:'0x7f4f…b8f', pnl:14900,   trades:1559, wr:45.2}
+];
+
+Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#475569';
+
+// KPIs
+const kpis = [
+  {l:'Total Trades',     v:'211,224',  n:'May 2023 – May 2025'},
+  {l:'Total PnL',        v:'$10.30M',  n:'All traders combined'},
+  {l:'Best Sentiment',   v:'Greed',    n:'$5.56M cumulative PnL'},
+  {l:'Highest Avg/Trade',v:'$78.69',   n:'Extreme Greed periods'},
+  {l:'Worst Win Rate',   v:'36.87%',   n:'During Fear regime'},
+  {l:'Peak Month',       v:'Dec 2024', n:'$3.00M in single month'}
+];
+document.getElementById('kpiStrip').innerHTML = kpis.map(k=>`
+  <div class="kpi-card">
+    <div class="kpi-label">${k.l}</div>
+    <div class="kpi-val">${k.v}</div>
+    <div class="kpi-note">${k.n}</div>
+  </div>`).join('');
+
+// PnL bar
+new Chart(document.getElementById('pnlBar'),{
+  type:'bar',
+  data:{
+    labels: SENT,
+    datasets:[{
+      label:'Total PnL ($)',
+      data: SENT.map(s=>PNL.find(d=>d.sentiment===s).total_pnl),
+      backgroundColor: SENT.map(s=>SENT_COLORS[s]+'bb'),
+      borderColor: SENT.map(s=>SENT_COLORS[s]),
+      borderWidth:1, borderRadius:3
+    }]
+  },
+  options:{
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'#f1f4f8'}, ticks:{font:{size:11}}},
+      y:{grid:{color:'#f1f4f8'}, ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}}
+    }
+  }
+});
+
+// Win rate + avg pnl
+new Chart(document.getElementById('winBar'),{
+  type:'bar',
+  data:{
+    labels: SENT,
+    datasets:[
+      {label:'Win Rate (%)', data:SENT.map(s=>PNL.find(d=>d.sentiment===s).win_rate),
+       backgroundColor:'#94a3b8bb', borderColor:'#64748b', borderWidth:1, borderRadius:3, yAxisID:'y1'},
+      {label:'Avg PnL/Trade ($)', data:SENT.map(s=>PNL.find(d=>d.sentiment===s).avg_pnl),
+       backgroundColor:'#1e2d40bb', borderColor:'#1e2d40', borderWidth:1, borderRadius:3, yAxisID:'y2'}
+    ]
+  },
+  options:{
+    plugins:{legend:{labels:{boxWidth:12, font:{size:11}}}},
+    scales:{
+      x:{grid:{color:'#f1f4f8'}, ticks:{font:{size:10}}},
+      y1:{type:'linear',position:'left', grid:{color:'#f1f4f8'}, ticks:{callback:v=>v+'%'}},
+      y2:{type:'linear',position:'right',grid:{display:false},  ticks:{callback:v=>'$'+v}}
+    }
+  }
+});
+
+// Volume donut
+new Chart(document.getElementById('volDonut'),{
+  type:'doughnut',
+  data:{
+    labels: SENT,
+    datasets:[{
+      data: SENT.map(s=>PNL.find(d=>d.sentiment===s).total_volume),
+      backgroundColor: SENT.map(s=>SENT_COLORS[s]+'cc'),
+      borderColor:'#f5f4f0', borderWidth:3
+    }]
+  },
+  options:{
+    cutout:'60%',
+    plugins:{
+      legend:{position:'right',labels:{boxWidth:13,font:{size:12},padding:14}},
+      tooltip:{callbacks:{label:ctx=>' $'+(ctx.parsed/1e6).toFixed(1)+'M'}}
+    }
+  }
+});
+
+// Bar rows (trade size vs win rate)
+const maxSize = Math.max(...PNL.map(d=>d.avg_trade_size));
+document.getElementById('barRows').innerHTML = PNL.map(d=>`
+  <div>
+    <div class="br-label">
+      <span class="br-name">${d.sentiment}</span>
+      <span class="br-val">Avg size $${d.avg_trade_size.toLocaleString()} &nbsp;·&nbsp; WR ${d.win_rate}%</span>
+    </div>
+    <div class="br-track">
+      <div class="br-fill" style="width:${(d.avg_trade_size/maxSize*100).toFixed(1)}%;background:${SENT_COLORS[d.sentiment]};"></div>
+    </div>
+  </div>`).join('');
+
+// Monthly bar
+new Chart(document.getElementById('monthlyBar'),{
+  type:'bar',
+  data:{
+    labels: MONTHLY.map(d=>d.m),
+    datasets:[{
+      label:'Monthly PnL ($)',
+      data: MONTHLY.map(d=>d.pnl),
+      backgroundColor: MONTHLY.map(d=>d.pnl>=0?'#27ae6099':'#c0392b99'),
+      borderColor: MONTHLY.map(d=>d.pnl>=0?'#27ae60':'#c0392b'),
+      borderWidth:1, borderRadius:3
+    }]
+  },
+  options:{
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'#f1f4f8'}, ticks:{font:{size:10}, maxRotation:45}},
+      y:{grid:{color:'#f1f4f8'}, ticks:{callback:v=>'$'+Math.round(v/1000)+'k'}}
+    }
+  }
+});
+
+// Coin × sentiment grouped
+const COINS = ['BTC','ETH','SOL','HYPE','@107'];
+const SENT_SHORT = ['Ext. Fear','Fear','Neutral','Greed','Ext. Greed'];
+const SENT_COLORS_LIST = ['#c0392b','#e07b54','#d4ac0d','#27ae60','#1a7a4a'];
+
+new Chart(document.getElementById('coinGrouped'),{
+  type:'bar',
+  data:{
+    labels: COINS,
+    datasets: SENT.map((s,i)=>({
+      label: SENT_SHORT[i],
+      data: COINS.map(c=>{ const r=COIN_SENT.find(d=>d.Coin===c&&d.sentiment===s); return r?r.avg_pnl:0; }),
+      backgroundColor: SENT_COLORS_LIST[i]+'bb',
+      borderColor: SENT_COLORS_LIST[i],
+      borderWidth:1, borderRadius:2
+    }))
+  },
+  options:{
+    plugins:{legend:{labels:{boxWidth:12,font:{size:11}}}},
+    scales:{
+      x:{grid:{color:'#f1f4f8'}},
+      y:{grid:{color:'#f1f4f8'}, ticks:{callback:v=>'$'+v}}
+    }
+  }
+});
+
+// Tables
+function tagSent(wr){
+  if(wr>=45) return `<span class="tag tag-g">${wr.toFixed(1)}%</span>`;
+  if(wr>=40) return `<span class="tag tag-n">${wr.toFixed(1)}%</span>`;
+  return `<span class="tag tag-f">${wr.toFixed(1)}%</span>`;
+}
+function buildTable(rows){
+  return `<table>
+    <thead><tr><th>#</th><th>Wallet</th><th>Total PnL</th><th>Trades</th><th>Win Rate</th></tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr>
+      <td>${i+1}</td>
+      <td><span class="mono">${r.addr}</span></td>
+      <td class="${r.pnl>=0?'green':'red'}">$${Math.abs(r.pnl/1000).toFixed(0)}k${r.pnl<0?' ↓':' ↑'}</td>
+      <td>${r.trades.toLocaleString()}</td>
+      <td>${tagSent(r.wr)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+document.getElementById('topTbl').outerHTML = buildTable(TOP);
+document.getElementById('botTbl').outerHTML = buildTable(BOT);
+
+// Insights
+const INS = [
+  {cls:'green', n:'01', t:'Greed drives the most profit', b:'Total PnL during Greed periods is $5.56M — nearly 3× higher than Fear phases. Extreme Greed adds another $1.58M with the highest avg per-trade return of $78.69.'},
+  {cls:'',      n:'02', t:'Fear = high volume, low returns', b:'Traders are most active during Fear ($622M volume, 76K trades), yet win rates drop to 36.87%. This points to reactive, emotional trading during market downturns.'},
+  {cls:'green', n:'03', t:'ETH is a strong Greed indicator', b:'ETH earns $323/trade on average during Greed — the highest of any asset-sentiment pair. It drops sharply to −$184 in Extreme Greed, making it a useful timing signal.'},
+  {cls:'amber', n:'04', t:'Win rate does not equal profitability', b:'The top wallet earned $2.14M with only a 33.7% win rate. Losers often had 40–45% win rates. Position sizing and loss discipline are more important than frequency.'},
+  {cls:'amber', n:'05', t:'Avg trade size is largest in Fear', b:'Average trade size peaks at $8,125 during Fear — 2× the size seen in Greed — yet returns are worst. Traders take larger bets under stress, compounding losses.'},
+  {cls:'',      n:'06', t:'SOL performs well across regimes', b:'SOL delivers positive average PnL in all five sentiment categories. It is the most consistent asset, making it a safer base position regardless of market mood.'},
+  {cls:'red',   n:'07', t:'@107 is highly sentiment-dependent', b:'@107 swings from −$21.76/trade in Fear to +$240.98 in Extreme Greed. Trading this asset without checking the sentiment index is a significant risk.'},
+  {cls:'',      n:'08', t:'December 2024 was the breakout month', b:'$3.01M PnL in a single month (Dec 2024) driven by peak Greed sentiment post-ETF euphoria. Trend-following in high-Greed environments has historically delivered the highest returns.'}
+];
+document.getElementById('insightGrid').innerHTML = INS.map(i=>`
+  <div class="insight-box ${i.cls}">
+    <div class="ib-num">FINDING ${i.n}</div>
+    <div class="ib-title">${i.t}</div>
+    <div class="ib-text">${i.b}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>
